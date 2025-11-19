@@ -38,11 +38,11 @@ class BorsaEkrani extends StatefulWidget {
 }
 
 class _BorsaEkraniState extends State<BorsaEkrani> {
-  final TextEditingController _controller = TextEditingController(text: "THYAO.IS");
+  // 1. KONTROL DEĞİŞKENLERİ EN ÜSTTE OLMALI!
+  final TextEditingController _controller = TextEditingController(text: "THYAO.IS"); // EKLENDİ
   Map<String, dynamic>? _sonuc;
   bool _yukleniyor = false;
   String? _hataMesaji;
-
   List<Map<String, dynamic>> _grafikVerisi = [];
 
   // Render adresin
@@ -50,7 +50,58 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
   // API Şifren
   final String apiKey = "BorsaKahini_GizliSifre_2025";
 
-  Future<void> analizEt() async {
+  // 2. KATEGORİ LİSTELERİ BURADAN SONRA GELMELİ
+
+  final List<Map<String, String>> kriptolar = [
+    {"isim": "Bitcoin", "kod": "BTC-USD"},
+    {"isim": "Ethereum", "kod": "ETH-USD"},
+    {"isim": "Binance", "kod": "BNB-USD"},
+    {"isim": "Solana", "kod": "SOL-USD"},
+    {"isim": "Ripple", "kod": "XRP-USD"},
+    {"isim": "Floki", "kod": "FLOKI-USD"},
+    {"isim": "Fetchai", "kod": "FET-USD"},
+    {"isim": "Ether.fi", "kod": "ETHFI-USD"},
+    {"isim": "Polkadot", "kod": "DOT-USD"},
+    {"isim": "Shiba Inu", "kod": "SHIB-USD"},
+    {"isim": "Terra-Clasic", "kod": "LUNC-USD"},
+    {"isim": "Pepecoin", "kod": "PEPE-USD"},
+  ];
+
+  final List<Map<String, String>> dovizler = [
+    {"isim": "Dolar", "kod": "USDTRY=X"},
+    {"isim": "Euro", "kod": "EURTRY=X"},
+    {"isim": "Sterlin", "kod": "GBPTRY=X"},
+    {"isim": "İsv. Frangı", "kod": "CHFTRY=X"},
+    {"isim": "Japon Yeni", "kod": "JPYTRY=X"},
+  ];
+
+  final List<Map<String, String>> emtialar = [
+    {"isim": "Altın (Ons)", "kod": "GC=F"},
+    {"isim": "Gümüş", "kod": "SI=F"},
+    {"isim": "Petrol", "kod": "CL=F"},
+    {"isim": "Platin", "kod": "PL=F"}
+  ];
+  // ------------------------------------------
+
+  final List<Map<String, String>> bistHisseleri = [
+    {"isim": "THY", "kod": "THYAO.IS"},
+    {"isim": "EREĞLİ", "kod": "EREGL.IS"},
+    {"isim": "SAHOL", "kod": "SAHOL.IS"},
+    {"isim": "TÜPRAŞ", "kod": "TUPRS.IS"},
+    {"isim": "GARANTİ", "kod": "GARAN.IS"},
+    {"isim": "ŞİŞECAM", "kod": "SISE.IS"},
+    {"isim": "BİM", "kod": "BIMAS.IS"},
+  ];
+  // ------------------------------------------
+
+  // FONSİYON GÜNCELLENDİ (ozelKod eklendi)
+  Future<void> analizEt({String? ozelKod}) async {
+    // Eğer butona basıldıysa text alanını güncelle ve o kodu kullan
+    String sembol = ozelKod ?? _controller.text.toUpperCase();
+    if (ozelKod != null) {
+      _controller.text = ozelKod;
+    }
+
     setState(() {
       _yukleniyor = true;
       _hataMesaji = null;
@@ -65,7 +116,7 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
           "Content-Type": "application/json",
           "X-API-Key": apiKey
         },
-        body: jsonEncode({"sembol": _controller.text.toUpperCase()}),
+        body: jsonEncode({"sembol": sembol}), // sembol kullanılıyor
       );
 
       if (response.statusCode == 200) {
@@ -96,7 +147,8 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
 
       } else {
         setState(() {
-          _hataMesaji = "Hata: ${response.statusCode}. Şifre veya Kod yanlış.";
+          // Hata mesajı sunucudan gelen kodla daha netleştirildi
+          _hataMesaji = "Hata: ${response.statusCode}. Sembol bulunamadı veya sunucu hatası.";
         });
       }
     } catch (e) {
@@ -112,6 +164,7 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. RefreshIndicator, kaydırılabilir bir widget'ı sarmalıdır (SingleChildScrollView)
     return Scaffold(
       appBar: AppBar(
         title: const Text("AI Borsa Kâhini 🧠"),
@@ -119,72 +172,127 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Hisse Kodu (Örn: GARAN.IS)",
-                filled: true,
-                fillColor: const Color(0xFF2D2D44),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search, color: Colors.blueAccent),
-                  onPressed: analizEt,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _yukleniyor ? null : analizEt,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _yukleniyor
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Analiz Et 🚀", style: TextStyle(fontSize: 18)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_hataMesaji != null)
-              Container(
-                padding: const EdgeInsets.all(10),
-                color: Colors.red.withOpacity(0.1),
-                child: Text(_hataMesaji!, style: const TextStyle(color: Colors.red)),
-              ),
+      body: RefreshIndicator( // <<< YENİ EKLENEN WIDGET
+        color: Colors.blueAccent, // Yenileme çubuğunun rengi
+        onRefresh: () => analizEt(), // Aşağı çekilince analizEt fonksiyonunu çağırır
 
-            if (_sonuc != null) ...[
-              _buildSonucKarti(),
-              const SizedBox(height: 30),
-              const Text("Son 30 Gün (Dokunarak İncele 👇)", style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 10),
-              Container(
-                height: 250,
-                padding: const EdgeInsets.fromLTRB(0, 20, 20, 0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2D2D44),
-                  borderRadius: BorderRadius.circular(15)
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          // ScrollView'ın her zaman kaydırılabilir olmasını sağlar.
+          // Bu, içerik kısayken bile aşağı çekmeyi mümkün kılar.
+          physics: const AlwaysScrollableScrollPhysics(),
+
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                // ... (TextField içeriği aynı kalır) ...
+              ),
+              const SizedBox(height: 20),
+
+              // --- KATEGORİ SEÇİM ALANI ---
+              _buildKategoriBaslik("💎 Kripto Paralar"),
+              _buildYatayListe(kriptolar, Colors.orange),
+
+              const SizedBox(height: 15),
+              _buildKategoriBaslik("🌍 Döviz Piyasası"),
+              _buildYatayListe(dovizler, Colors.green),
+
+              const SizedBox(height: 15),
+              _buildKategoriBaslik("🥇 Emtia (Altın/Gümüş/Petrol)"),
+              _buildYatayListe(emtialar, Colors.amber),
+
+              const SizedBox(height: 15),
+              _buildKategoriBaslik("🇹🇷 BIST Popüler Hisseler"),
+              _buildYatayListe(bistHisseleri, Colors.blue),
+
+              // ---------------------------
+
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _yukleniyor ? null : () => analizEt(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _yukleniyor
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("Analiz Et 🚀", style: TextStyle(fontSize: 18)),
                 ),
-                child: _grafikVerisi.isNotEmpty
-                    ? _buildGrafik()
-                    : const Center(child: Text("Veri bekleniyor...", style: TextStyle(color: Colors.white54))),
-              )
-            ]
-          ],
+              ),
+              const SizedBox(height: 20),
+              if (_hataMesaji != null)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  color: Colors.red.withOpacity(0.1),
+                  child: Text(_hataMesaji!, style: const TextStyle(color: Colors.red)),
+                ),
+
+              if (_sonuc != null) ...[
+                _buildSonucKarti(),
+                const SizedBox(height: 30),
+                const Text("Son 30 Gün (Dokunarak İncele 👇)", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 10),
+                Container(
+                  height: 250,
+                  padding: const EdgeInsets.fromLTRB(0, 20, 20, 0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2D2D44),
+                    borderRadius: BorderRadius.circular(15)
+                  ),
+                  child: _grafikVerisi.isNotEmpty
+                      ? _buildGrafik()
+                      : const Center(child: Text("Veri bekleniyor...", style: TextStyle(color: Colors.white54))),
+                )
+              ]
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGrafik() {
+  // --- YARDIMCI WIDGET'LAR ---
+
+  // Kategori Başlık Widget'ı
+  Widget _buildKategoriBaslik(String baslik) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, left: 5),
+      child: Text(baslik, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+    );
+  }
+
+  // Yatay Liste Widget'ı (ActionChip'ler)
+  Widget _buildYatayListe(List<Map<String, String>> liste, Color renk) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: liste.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: ActionChip(
+              label: Text(item["isim"]!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: renk.withOpacity(0.2),
+              side: BorderSide(color: renk, width: 1),
+              onPressed: () => analizEt(ozelKod: item["kod"]),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ... _buildGrafik, _buildSonucKarti ve _buildBilgi fonksiyonları devam etmeli ...
+
+Widget _buildGrafik() {
     if (_grafikVerisi.isEmpty) return const SizedBox();
+
+    // Hangi varlık olduğunu kontrol etmek için basamak sayısını belirle
+    final bool isCrypto = (_sonuc!['hisse'] as String).endsWith('-USD');
+    final int digits = isCrypto ? 8 : 4; // Kripto ise 8, değilse 4 basamak
 
     List<double> fiyatlar = _grafikVerisi.map((e) => e['fiyat'] as double).toList();
 
@@ -207,7 +315,6 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
         maxY: maxY,
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            // DÜZELTME BURADA: tooltipBgColor yerine getTooltipColor
             getTooltipColor: (touchedSpot) => Colors.blueAccent,
             getTooltipItems: (touchedSpots) {
               return touchedSpots.map((spot) {
@@ -216,7 +323,7 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
                 double fiyat = _grafikVerisi[index]['fiyat'];
 
                 return LineTooltipItem(
-                  '$tarih\n$fiyat',
+                  '$tarih\n${fiyat.toStringAsFixed(digits)}', // DİNAMİK FORMAT
                   const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 );
               }).toList();
@@ -242,9 +349,17 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
     );
   }
 
-  Widget _buildSonucKarti() {
+Widget _buildSonucKarti() {
     final sinyal = _sonuc!['sinyal'];
     final renk = sinyal.contains("AL") ? Colors.green : (sinyal.contains("SAT") ? Colors.red : Colors.grey);
+
+    // Hangi varlık olduğunu kontrol etmek için basamak sayısını belirle
+    final bool isCrypto = (_sonuc!['hisse'] as String).endsWith('-USD');
+    final int digits = isCrypto ? 8 : 4; // Kripto ise 8, değilse 4 basamak
+
+    // API'dan gelen fiyatlar (num olarak varsayılıyor)
+    final num currentPrice = _sonuc!['fiyat'] as num;
+    final num predictedPrice = _sonuc!['tahmin'] as num;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -262,9 +377,11 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildBilgi("Şu An", "\$${_sonuc!['fiyat']}"),
+              // Fiyat dinamik basamağa sabitlendi
+              _buildBilgi("Şu An", "\$${currentPrice.toStringAsFixed(digits)}"),
               const Icon(Icons.arrow_forward, color: Colors.grey),
-              _buildBilgi("Tahmin", "\$${_sonuc!['tahmin']}"),
+              // Tahmin dinamik basamağa sabitlendi
+              _buildBilgi("Tahmin", "\$${predictedPrice.toStringAsFixed(digits)}"),
             ],
           ),
           const SizedBox(height: 20),
