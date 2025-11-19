@@ -21,7 +21,8 @@ varliklar = [
     "UNI3-USD", "AAVE3-USD", "ATOM-USD", "XMR-USD", "HBAR-USD",
     "EGLD-USD", "CRV-USD", "COMP-USD", "NEAR-USD", "APT-USD",
     "GALA-USD", "MKR-USD", "KAVA-USD", "FET-USD", "WAVES-USD", 
-    
+    "FLOKI-USD",     
+
     # --- DÖVİZLER (TL Karşılığı) ---
     "USDTRY=X", "EURTRY=X", "GBPTRY=X", "CHFTRY=X", "JPYTRY=X", 
     "CADTRY=X", "AUDTRY=X", "CNYTRY=X", "SARTRY=X", "RUBTRY=X",
@@ -30,11 +31,12 @@ varliklar = [
     "GC=F",  # Altın (Ons)
     "SI=F",  # Gümüş
     "CL=F",  # Ham Petrol
+    "PL=F",  # Platin
 ]
 
 # Ayarlar
 start_date = "2020-01-01"
-time_step = 30 
+time_step = 60 
 
 print(f"🚀 Toplam {len(varliklar)} varlık için eğitim başlıyor... Bu işlem uzun sürebilir.")
 
