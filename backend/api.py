@@ -77,7 +77,7 @@ def analiz_et(ticker):
             model.add(Dropout(0.2))
             model.add(Dense(1))
             model.compile(optimizer='adam', loss='mse')
-            model.fit(x_input, y_output, epochs=10, batch_size=32, verbose=0)
+            model.fit(x_input, y_output, epochs=5, batch_size=32, verbose=0)
             model.save(model_name)
 
         # 5. Tahmin
