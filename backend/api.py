@@ -8,18 +8,28 @@ from pydantic import BaseModel
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout
+from fastapi import Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 
 app = FastAPI()
 
 # --- CORS AYARLARI ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Netlify'dan aldığın site adresini buraya tam olarak yaz
+    # ÖRNEK: "https://wonderful-site-12345.netlify.app"
+    IZINLI_SITELER=[
+        "https://delightful-chaja-a05dcb.netlify.app/",
+        "http://localhost:3000"  # Test ederken lazım olabilir
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=IZINLI_SITELER,  # Artık yıldız (*) yok, sadece sen varsın!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # --- AKILLI HAFIZA (CACHE) ---
 # Aynı hisse tekrar sorulursa veriyi buradan çekeceğiz
 SONUC_HAFIZASI = {}
@@ -133,15 +143,23 @@ def analiz_et(ticker):
         print(f"Hata oluştu: {genel_hata}")
         return None
 
+# GÜVENLİK AYARLARI
+API_KEY = "Deniz&2009" # Bunu zor bir şey yapabilirsin
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
 
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == API_KEY:
+        return api_key_header
+    else:
+        raise HTTPException(status_code=403, detail="⛔ Yetkisiz Erişim: Şifre Yanlış!")
+
+# Endpoint'i Korumaya Al
 @app.post("/analiz")
-def api_analiz(istek: HisseIstegi):
+def api_analiz(istek: HisseIstegi, api_key: str = Depends(get_api_key)): # <-- Burası değişti
     sonuc = analiz_et(istek.sembol)
     if sonuc:
         return sonuc
     raise HTTPException(status_code=404, detail="Analiz başarısız")
-
-
 @app.get("/")
 def ana_sayfa():
     return {"mesaj": "Yapay Zeka Sunucusu Aktif (Turbo Mod) 🚀"}

@@ -52,7 +52,11 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
     try {
       final response = await http.post(
         url,
-        headers: {"Content-Type": "application/json"},
+        // HEADER KISMINA ŞİFREYİ EKLİYORUZ
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": "Deniz&2009" // Backend'dekiyle AYNI olmalı
+        },
         body: jsonEncode({"sembol": _controller.text.toUpperCase()}),
       );
 
