@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:fl_chart/fl_chart.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'Borsa Kâhini',
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.blueAccent,
         scaffoldBackgroundColor: const Color(0xFF1E1E2C),
@@ -34,44 +36,59 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
   Map<String, dynamic>? _sonuc;
   bool _yukleniyor = false;
   String? _hataMesaji;
+  List<double> _grafikVerisi = [];
 
-  // API İSTEĞİ GÖNDERME
+  // Render adresini buraya yapıştır
+  final url = Uri.parse('https://borsa-api-ompc.onrender.com/analiz');
+  // API Şifreni buraya yapıştır
+  final String apiKey = "BorsaKahini_GizliSifre_2025";
+
   Future<void> analizEt() async {
     setState(() {
       _yukleniyor = true;
       _hataMesaji = null;
       _sonuc = null;
+      _grafikVerisi = [];
     });
-
-    // NOT: Android Emülatör kullanıyorsan '10.0.2.2' kullanmalısın.
-    // Gerçek telefonda test ediyorsan bilgisayarının IP adresini yaz (Örn: 192.168.1.25)
-    //final url = Uri.parse('http://10.0.2.2:8000/analiz');
-    // Render'daki Canlı Sunucu Adresimiz:
-      final url = Uri.parse('https://borsa-api-ompc.onrender.com/analiz');
 
     try {
       final response = await http.post(
         url,
-        // HEADER KISMINA ŞİFREYİ EKLİYORUZ
         headers: {
           "Content-Type": "application/json",
-          "X-API-Key": "Deniz&2009" // Backend'dekiyle AYNI olmalı
+          "X-API-Key": apiKey
         },
         body: jsonEncode({"sembol": _controller.text.toUpperCase()}),
       );
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        List<dynamic> rawList = data['gecmis'] ?? [];
+        List<double> prices = [];
+        if (rawList.isNotEmpty) {
+           prices = rawList.map((e) => (e as num).toDouble()).toList();
+        }
+
         setState(() {
-          _sonuc = jsonDecode(response.body);
+          _sonuc = data;
+          _grafikVerisi = prices;
         });
+
+        if (prices.isEmpty) {
+           setState(() {
+             _hataMesaji = "Analiz başarılı ama grafik verisi gelmedi. Sunucu güncelleniyor olabilir.";
+           });
+        }
+
       } else {
         setState(() {
-          _hataMesaji = "Analiz başarısız. Hisse kodunu kontrol edin.";
+          _hataMesaji = "Hata: ${response.statusCode}. Şifre veya Hisse Kodu yanlış.";
         });
       }
     } catch (e) {
       setState(() {
-        _hataMesaji = "Sunucuya bağlanılamadı. Backend açık mı?";
+        _hataMesaji = "Bağlantı hatası: $e";
       });
     } finally {
       setState(() {
@@ -89,17 +106,15 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // GİRİŞ ALANI
             TextField(
               controller: _controller,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: "Hisse Kodu (Örn: THYAO.IS)",
-                labelStyle: const TextStyle(color: Colors.grey),
+                labelText: "Hisse Kodu (Örn: GARAN.IS)",
                 filled: true,
                 fillColor: const Color(0xFF2D2D44),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -110,8 +125,6 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ANALİZ BUTONU
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -123,21 +136,33 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
                 ),
                 child: _yukleniyor
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Yapay Zekaya Sor 🚀", style: TextStyle(fontSize: 18)),
+                    : const Text("Analiz Et 🚀", style: TextStyle(fontSize: 18)),
               ),
             ),
-            const SizedBox(height: 30),
-
-            // SONUÇ ALANI
+            const SizedBox(height: 20),
             if (_hataMesaji != null)
               Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(color: Colors.red.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.all(10),
+                color: Colors.red.withOpacity(0.1),
                 child: Text(_hataMesaji!, style: const TextStyle(color: Colors.red)),
               ),
 
             if (_sonuc != null) ...[
               _buildSonucKarti(),
+              const SizedBox(height: 30),
+              const Text("Son 30 Günlük Trend", style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 10),
+              Container(
+                height: 250,
+                padding: const EdgeInsets.fromLTRB(0, 20, 20, 0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2D2D44),
+                  borderRadius: BorderRadius.circular(15)
+                ),
+                child: _grafikVerisi.isNotEmpty
+                    ? _buildGrafik()
+                    : const Center(child: Text("Grafik verisi bekleniyor...", style: TextStyle(color: Colors.white54))),
+              )
             ]
           ],
         ),
@@ -145,7 +170,47 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
     );
   }
 
-  // SONUÇ KARTI TASARIMI
+  Widget _buildGrafik() {
+    if (_grafikVerisi.isEmpty) return const SizedBox();
+
+    double minY = _grafikVerisi.reduce((curr, next) => curr < next ? curr : next);
+    double maxY = _grafikVerisi.reduce((curr, next) => curr > next ? curr : next);
+
+    if (minY == maxY) {
+      minY = minY * 0.99;
+      maxY = maxY * 1.01;
+    }
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: false),
+        titlesData: FlTitlesData(show: false),
+        borderData: FlBorderData(show: false),
+        minX: 0,
+        maxX: (_grafikVerisi.length - 1).toDouble(),
+        minY: minY,
+        maxY: maxY,
+        lineBarsData: [
+          LineChartBarData(
+            spots: _grafikVerisi.asMap().entries.map((e) {
+              return FlSpot(e.key.toDouble(), e.value);
+            }).toList(),
+            isCurved: true,
+            // DÜZELTME BURADA: 'colors' yerine 'color' yaptık
+            color: Colors.blueAccent,
+            barWidth: 3,
+            dotData: FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              // DÜZELTME BURADA: 'colors' yerine 'color' yaptık
+              color: Colors.blueAccent.withOpacity(0.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSonucKarti() {
     final sinyal = _sonuc!['sinyal'];
     final renk = sinyal.contains("AL") ? Colors.green : (sinyal.contains("SAT") ? Colors.red : Colors.grey);
@@ -166,31 +231,26 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildBilgiKutusu("Şu An", "\$${_sonuc!['fiyat']}"),
+              _buildBilgi("Şu An", "\$${_sonuc!['fiyat']}"),
               const Icon(Icons.arrow_forward, color: Colors.grey),
-              _buildBilgiKutusu("Tahmin", "\$${_sonuc!['tahmin']}"),
+              _buildBilgi("Tahmin", "\$${_sonuc!['tahmin']}"),
             ],
           ),
           const SizedBox(height: 20),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 40),
             decoration: BoxDecoration(color: renk, borderRadius: BorderRadius.circular(30)),
-            child: Text(
-              sinyal,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
+            child: Text(sinyal, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
-          const SizedBox(height: 10),
-          Text("Beklenen Değişim: %${_sonuc!['fark']}", style: TextStyle(color: renk)),
         ],
       ),
     );
   }
 
-  Widget _buildBilgiKutusu(String baslik, String deger) {
+  Widget _buildBilgi(String baslik, String deger) {
     return Column(
       children: [
-        Text(baslik, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+        Text(baslik, style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 5),
         Text(deger, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
       ],
