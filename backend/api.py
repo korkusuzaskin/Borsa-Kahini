@@ -21,8 +21,7 @@ app.add_middleware(
     allow_origins=IZINLI_SITELER,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-)
+    allow_headers=["*"],)
 
 API_KEY = "BorsaKahini_GizliSifre_2025"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
