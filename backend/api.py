@@ -1,10 +1,9 @@
 import os
 import numpy as np
-import pandas as pd
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware  # <--- YENİ EKLENDİ
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
@@ -12,21 +11,23 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 app = FastAPI()
 
-# --- CORS AYARLARI (YENİ EKLENDİ) ---
-# Bu kısım, iPhone/Web uygulamasının sunucuyla konuşmasına izin verir.
+# --- CORS AYARLARI ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tüm sitelerden gelen isteklere izin ver
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # GET, POST, OPTIONS hepsine izin ver
+    allow_methods=["*"],
     allow_headers=["*"],
 )
-# ------------------------------------
+
+# --- AKILLI HAFIZA (CACHE) ---
+# Aynı hisse tekrar sorulursa veriyi buradan çekeceğiz
+SONUC_HAFIZASI = {}
+HAFIZA_SURESI_DAKIKA = 60
 
 # --- AYARLAR ---
-start_date = "2015-01-01"
-end_date = datetime.now().strftime('%Y-%m-%d')
-time_step = 60
+start_date = "2020-01-01"
+time_step = 30
 ESIK_DEGERI = 0.005
 
 
@@ -35,21 +36,33 @@ class HisseIstegi(BaseModel):
 
 
 def analiz_et(ticker):
-    # Yahoo Finance kripto düzeltmesi (BTC.USD -> BTC-USD)
+    global SONUC_HAFIZASI
+
+    # Yahoo Finance Kripto Düzeltmesi
     if "." in ticker and "USD" in ticker:
         ticker = ticker.replace(".", "-")
 
+    # 1. HAFIZA KONTROLÜ
+    if ticker in SONUC_HAFIZASI:
+        kayit = SONUC_HAFIZASI[ticker]
+        gecen_sure = datetime.now() - kayit["zaman"]
+        if gecen_sure < timedelta(minutes=HAFIZA_SURESI_DAKIKA):
+            print(f"🚀 Hafızadan getirildi: {ticker}")
+            return kayit["veri"]
+
     try:
-        # 1. Veri İndirme
-        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
-        if len(df) < 200:
+        # 2. VERİ İNDİRME
+        bugun = datetime.now().strftime('%Y-%m-%d')
+        df = yf.download(ticker, start=start_date, end=bugun, progress=False)
+
+        if len(df) < 100:
             return None
 
-        # 2. İndikatörler
+        # İndikatörler
         df['MA50'] = df['Close'].rolling(window=50).mean()
         df.dropna(inplace=True)
 
-        # 3. Hazırlık
+        # Veri Hazırlama
         data = df[['Close', 'MA50']].values
         scaler = MinMaxScaler(feature_range=(0, 1))
         scaled_data = scaler.fit_transform(data)
@@ -65,22 +78,23 @@ def analiz_et(ticker):
         x_input, y_output = np.array(x_input), np.array(y_output)
         x_input = np.reshape(x_input, (x_input.shape[0], x_input.shape[1], x_input.shape[2]))
 
-        # 4. Model (Varsa Yükle, Yoksa Eğit)
-        model_name = f"{ticker}_model.keras"
+        # 3. MODEL (TURBO MOD: HAFİFLETİLMİŞ)
+        model_name = f"{ticker}_lite_model.keras"
+
         if os.path.exists(model_name):
             model = load_model(model_name)
         else:
             model = Sequential()
-            model.add(LSTM(50, return_sequences=True, input_shape=(x_input.shape[1], x_input.shape[2])))
-            model.add(Dropout(0.2))
-            model.add(LSTM(50))
-            model.add(Dropout(0.2))
+            # Tek katmanlı hızlı model
+            model.add(LSTM(32, return_sequences=False, input_shape=(x_input.shape[1], x_input.shape[2])))
+            model.add(Dropout(0.1))
             model.add(Dense(1))
             model.compile(optimizer='adam', loss='mse')
-            model.fit(x_input, y_output, epochs=5, batch_size=32, verbose=0)
+            # Epochs sayısını düşürdük (Hız için)
+            model.fit(x_input, y_output, epochs=5, batch_size=16, verbose=0)
             model.save(model_name)
 
-        # 5. Tahmin
+        # 4. TAHMİN
         last_block = scaled_data[-time_step:, :]
         x_future = np.reshape(last_block, (1, time_step, scaled_data.shape[1]))
         pred_scaled = model.predict(x_future, verbose=0)
@@ -99,15 +113,24 @@ def analiz_et(ticker):
         else:
             sinyal = "BEKLE ⚪"
 
-        return {
+        sonuc_objesi = {
             "hisse": ticker,
             "fiyat": round(fiyat, 2),
             "tahmin": round(tahmin, 2),
             "fark": round(((tahmin - fiyat) / fiyat) * 100, 2),
             "sinyal": sinyal
         }
-    except Exception as e:
-        print(f"Hata: {e}")
+
+        # Sonucu hafızaya kaydet
+        SONUC_HAFIZASI[ticker] = {
+            "zaman": datetime.now(),
+            "veri": sonuc_objesi
+        }
+
+        return sonuc_objesi
+
+    except Exception as genel_hata:
+        print(f"Hata oluştu: {genel_hata}")
         return None
 
 
@@ -121,4 +144,4 @@ def api_analiz(istek: HisseIstegi):
 
 @app.get("/")
 def ana_sayfa():
-    return {"mesaj": "Yapay Zeka Sunucusu Aktif ve Çalışıyor! 🚀"}
+    return {"mesaj": "Yapay Zeka Sunucusu Aktif (Turbo Mod) 🚀"}
