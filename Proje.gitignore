@@ -1,0 +1,17 @@
+# Python Gereksizleri
+backend/.venv/
+backend/__pycache__/
+*.pyc
+
+# Flutter Gereksizleri
+mobile/.dart_tool/
+mobile/.idea/
+mobile/build/
+mobile/.pub/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Sistem Dosyaları
+.DS_Store
+Thumbs.db
+.idea/
