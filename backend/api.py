@@ -2,8 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from datetime import datetime  # Standart zaman kütüphanesi (Uyarı vermez)
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # <--- YENİ EKLENDİ
 from pydantic import BaseModel
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
@@ -11,9 +12,19 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 app = FastAPI()
 
+# --- CORS AYARLARI (YENİ EKLENDİ) ---
+# Bu kısım, iPhone/Web uygulamasının sunucuyla konuşmasına izin verir.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Tüm sitelerden gelen isteklere izin ver
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, OPTIONS hepsine izin ver
+    allow_headers=["*"],
+)
+# ------------------------------------
+
 # --- AYARLAR ---
 start_date = "2015-01-01"
-# Pandas yerine standart Python datetime kullanıyoruz -> Uyarı Çözüldü ✅
 end_date = datetime.now().strftime('%Y-%m-%d')
 time_step = 60
 ESIK_DEGERI = 0.005
@@ -24,6 +35,10 @@ class HisseIstegi(BaseModel):
 
 
 def analiz_et(ticker):
+    # Yahoo Finance kripto düzeltmesi (BTC.USD -> BTC-USD)
+    if "." in ticker and "USD" in ticker:
+        ticker = ticker.replace(".", "-")
+
     try:
         # 1. Veri İndirme
         df = yf.download(ticker, start=start_date, end=end_date, progress=False)

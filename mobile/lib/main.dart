@@ -45,7 +45,9 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
 
     // NOT: Android Emülatör kullanıyorsan '10.0.2.2' kullanmalısın.
     // Gerçek telefonda test ediyorsan bilgisayarının IP adresini yaz (Örn: 192.168.1.25)
-    final url = Uri.parse('http://10.0.2.2:8000/analiz');
+    //final url = Uri.parse('http://10.0.2.2:8000/analiz');
+    // Render'daki Canlı Sunucu Adresimiz:
+      final url = Uri.parse('https://borsa-api-ompc.onrender.com/analiz');
 
     try {
       final response = await http.post(
