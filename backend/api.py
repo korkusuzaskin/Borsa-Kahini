@@ -13,7 +13,6 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 app = FastAPI()
 
 # --- GÜVENLİK VE CORS ---
-# Kendi Netlify adresini buraya ekleyebilirsin
 IZINLI_SITELER = ["*"]
 
 app.add_middleware(
@@ -21,7 +20,8 @@ app.add_middleware(
     allow_origins=IZINLI_SITELER,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],)
+    allow_headers=["*"],
+)
 
 API_KEY = "BorsaKahini_GizliSifre_2025"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
@@ -58,7 +58,6 @@ def analiz_et(ticker):
     if ticker in SONUC_HAFIZASI:
         kayit = SONUC_HAFIZASI[ticker]
         if datetime.now() - kayit["zaman"] < timedelta(minutes=HAFIZA_SURESI_DAKIKA):
-            print(f"🚀 Hafızadan: {ticker}")
             return kayit["veri"]
 
     try:
@@ -72,10 +71,17 @@ def analiz_et(ticker):
         df['MA50'] = df['Close'].rolling(window=50).mean()
         df.dropna(inplace=True)
 
-        # --- YENİ: GRAFİK İÇİN SON 30 GÜN VERİSİ ---
-        # Son 30 günün kapanış fiyatlarını listeye çeviriyoruz
-        son_30_gun = df['Close'].tail(30).values.flatten().tolist()
-        # -------------------------------------------
+        # --- TARİH VE FİYAT PAKETLEME (YENİ KISIM) ---
+        son_30_df = df.tail(30)
+        # Tarihleri "19-11" formatına çevirip listeye alıyoruz
+        tarihler = son_30_df.index.strftime('%d-%m').tolist()
+        fiyatlar = son_30_df['Close'].values.flatten().tolist()
+
+        # İkisini birleştir: [{"tarih": "19-11", "fiyat": 100}, ...]
+        gecmis_verisi = []
+        for t, f in zip(tarihler, fiyatlar):
+            gecmis_verisi.append({"tarih": t, "fiyat": f})
+        # ---------------------------------------------
 
         # Veri Hazırlama
         data = df[['Close', 'MA50']].values
@@ -126,7 +132,7 @@ def analiz_et(ticker):
             "tahmin": round(tahmin, 2),
             "fark": round(((tahmin - fiyat) / fiyat) * 100, 2),
             "sinyal": sinyal,
-            "gecmis": son_30_gun  # <-- Grafik verisi buraya eklendi
+            "gecmis": gecmis_verisi  # <-- Artık tarih bilgisi de var
         }
 
         SONUC_HAFIZASI[ticker] = {"zaman": datetime.now(), "veri": sonuc_objesi}
