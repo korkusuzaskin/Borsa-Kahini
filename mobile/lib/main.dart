@@ -18,6 +18,12 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.blueAccent,
         scaffoldBackgroundColor: const Color(0xFF1E1E2C),
+        tooltipTheme: TooltipThemeData(
+          decoration: BoxDecoration(
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
       home: const BorsaEkrani(),
     );
@@ -36,11 +42,12 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
   Map<String, dynamic>? _sonuc;
   bool _yukleniyor = false;
   String? _hataMesaji;
-  List<double> _grafikVerisi = [];
 
-  // Render adresini buraya yapıştır
+  List<Map<String, dynamic>> _grafikVerisi = [];
+
+  // Render adresin
   final url = Uri.parse('https://borsa-api-ompc.onrender.com/analiz');
-  // API Şifreni buraya yapıştır
+  // API Şifren
   final String apiKey = "BorsaKahini_GizliSifre_2025";
 
   Future<void> analizEt() async {
@@ -65,25 +72,31 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
         final data = jsonDecode(response.body);
 
         List<dynamic> rawList = data['gecmis'] ?? [];
-        List<double> prices = [];
+        List<Map<String, dynamic>> processedList = [];
+
         if (rawList.isNotEmpty) {
-           prices = rawList.map((e) => (e as num).toDouble()).toList();
+           for(var item in rawList) {
+             processedList.add({
+               "tarih": item["tarih"],
+               "fiyat": (item["fiyat"] as num).toDouble()
+             });
+           }
         }
 
         setState(() {
           _sonuc = data;
-          _grafikVerisi = prices;
+          _grafikVerisi = processedList;
         });
 
-        if (prices.isEmpty) {
+        if (processedList.isEmpty) {
            setState(() {
-             _hataMesaji = "Analiz başarılı ama grafik verisi gelmedi. Sunucu güncelleniyor olabilir.";
+             _hataMesaji = "Veri geldi ama grafik bilgisi boş. Sunucuyu bekleyin.";
            });
         }
 
       } else {
         setState(() {
-          _hataMesaji = "Hata: ${response.statusCode}. Şifre veya Hisse Kodu yanlış.";
+          _hataMesaji = "Hata: ${response.statusCode}. Şifre veya Kod yanlış.";
         });
       }
     } catch (e) {
@@ -150,7 +163,7 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
             if (_sonuc != null) ...[
               _buildSonucKarti(),
               const SizedBox(height: 30),
-              const Text("Son 30 Günlük Trend", style: TextStyle(color: Colors.grey)),
+              const Text("Son 30 Gün (Dokunarak İncele 👇)", style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 10),
               Container(
                 height: 250,
@@ -161,7 +174,7 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
                 ),
                 child: _grafikVerisi.isNotEmpty
                     ? _buildGrafik()
-                    : const Center(child: Text("Grafik verisi bekleniyor...", style: TextStyle(color: Colors.white54))),
+                    : const Center(child: Text("Veri bekleniyor...", style: TextStyle(color: Colors.white54))),
               )
             ]
           ],
@@ -173,8 +186,10 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
   Widget _buildGrafik() {
     if (_grafikVerisi.isEmpty) return const SizedBox();
 
-    double minY = _grafikVerisi.reduce((curr, next) => curr < next ? curr : next);
-    double maxY = _grafikVerisi.reduce((curr, next) => curr > next ? curr : next);
+    List<double> fiyatlar = _grafikVerisi.map((e) => e['fiyat'] as double).toList();
+
+    double minY = fiyatlar.reduce((curr, next) => curr < next ? curr : next);
+    double maxY = fiyatlar.reduce((curr, next) => curr > next ? curr : next);
 
     if (minY == maxY) {
       minY = minY * 0.99;
@@ -187,22 +202,38 @@ class _BorsaEkraniState extends State<BorsaEkrani> {
         titlesData: FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
         minX: 0,
-        maxX: (_grafikVerisi.length - 1).toDouble(),
+        maxX: (fiyatlar.length - 1).toDouble(),
         minY: minY,
         maxY: maxY,
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            // DÜZELTME BURADA: tooltipBgColor yerine getTooltipColor
+            getTooltipColor: (touchedSpot) => Colors.blueAccent,
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((spot) {
+                int index = spot.x.toInt();
+                String tarih = _grafikVerisi[index]['tarih'];
+                double fiyat = _grafikVerisi[index]['fiyat'];
+
+                return LineTooltipItem(
+                  '$tarih\n$fiyat',
+                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                );
+              }).toList();
+            },
+          ),
+        ),
         lineBarsData: [
           LineChartBarData(
-            spots: _grafikVerisi.asMap().entries.map((e) {
+            spots: fiyatlar.asMap().entries.map((e) {
               return FlSpot(e.key.toDouble(), e.value);
             }).toList(),
             isCurved: true,
-            // DÜZELTME BURADA: 'colors' yerine 'color' yaptık
             color: Colors.blueAccent,
             barWidth: 3,
             dotData: FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              // DÜZELTME BURADA: 'colors' yerine 'color' yaptık
               color: Colors.blueAccent.withOpacity(0.2),
             ),
           ),
